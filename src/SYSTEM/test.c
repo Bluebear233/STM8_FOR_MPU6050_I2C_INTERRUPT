@@ -20,7 +20,7 @@ uint8_t I2C_Config() {
 uint8_t I2C_Multiple_Read(uint8_t slave_address, uint8_t reg_address,
 		uint8_t * buff_point, uint8_t read_len) {
 
-	while (!I2C_WriteRegister(slave_address, SEV_BIT_ADDRESS, NOSTOP, 1,
+	while (!I2C_WriteRegister(slave_address, reg_address, NOSTOP, 0,
 			&reg_address))
 		;
 	while (!I2C_ReadRegister(slave_address, SEV_BIT_ADDRESS, NOSTOP, read_len,
@@ -38,15 +38,8 @@ uint8_t I2C_Multiple_Read(uint8_t slave_address, uint8_t reg_address,
 uint8_t I2C_Multiple_Write(uint8_t slave_address, uint8_t reg_address,
 		uint8_t *buff_point, uint8_t data_len) {
 
-	static uint8_t buf[256];
-	buf[0] = reg_address;
-	for (uint8_t len = 0; len < data_len; len++) {
-		buf[len + 1] = *buff_point;
-		buff_point++;
-	}
-
-	while (!I2C_WriteRegister(slave_address, SEV_BIT_ADDRESS, STOP,
-			data_len + 1, buf))
+	while (!I2C_WriteRegister(slave_address, reg_address, STOP, data_len,
+			buff_point))
 		;
 	extern uint8_t STATE;
 	while (STATE != INI_00)

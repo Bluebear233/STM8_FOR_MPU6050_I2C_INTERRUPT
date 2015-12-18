@@ -32,6 +32,7 @@ u8 u8_Direction;
 uint8_t g_Data_Len;
 uint8_t *g_Data_Point;
 uint8_t g_Slave_Address;
+uint8_t g_Reg_Address;
 
 u8 u8_NoStop_cpy;
 
@@ -96,6 +97,7 @@ u8 I2C_WriteRegister(u16 u16_SlaveAdd, u8 u8_AddType, u8 u8_NoStop,
 	// setup I2C comm. in write
 	// copy parametters for interrupt routines
 	u8_NoStop_cpy = u8_NoStop;
+	g_Reg_Address = u8_AddType;
 	g_Slave_Address = u16_SlaveAdd;
 	g_Data_Len = u8_NumByteToWrite;
 	g_Data_Point = pu8_DataBuffer;
@@ -131,6 +133,7 @@ u8 I2C_ReadRegister(u16 u16_SlaveAdd, u8 u8_AddType, u8 u8_NoStop,
 	// setup I2C comm. in Read
 	// copy parametters for interrupt routines
 	u8_NoStop_cpy = u8_NoStop;
+	g_Reg_Address = u8_AddType;
 	g_Slave_Address = u16_SlaveAdd;
 	g_Data_Len = u8_NumByteToRead;
 	g_Data_Point = u8_DataBuffer;
@@ -226,8 +229,7 @@ void I2CInterruptHandle(void) {
 
 			/* Clear Add Ack Flag */
 			I2C->SR3;
-			I2C->DR = *g_Data_Point++;
-			g_Data_Len--;
+			I2C->DR = g_Reg_Address;
 			STATE = BTF_04;
 			break;
 
