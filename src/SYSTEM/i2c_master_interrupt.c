@@ -33,8 +33,7 @@ uint8_t g_Data_Len;
 uint8_t *g_Data_Point;
 uint8_t g_Slave_Address;
 uint8_t g_Reg_Address;
-
-u8 u8_NoStop_cpy;
+uint8_t g_RW_State;
 
 /******************************************************************************
  * Function name : I2C_Init
@@ -56,6 +55,35 @@ void I2C_Interrupt_Confing(void) {
 	err_save = 0;
 	STATE = INI_00;
 	set_tout_ms(0);
+}
+uint8_t I2C_Multiple_Write_With_Block(uint8_t slave_address,
+		uint8_t reg_address, uint8_t data_len, u8 *data_point) {
+	//等待上次通信结束
+	while (STATE != INI_00)
+		;
+	//等待I2C空闲
+	while ((I2C->SR3 & I2C_SR3_BUSY) == I2C_SR3_BUSY)
+		;
+
+	// set ACK
+	I2C->CR2 |= I2C_CR2_ACK;
+	// reset POS
+	I2C->CR2 &= ~I2C_CR2_POS;
+	// setup I2C comm. in write
+	// copy parametters for interrupt routines
+	g_RW_State = STOP;
+	g_Reg_Address = reg_address;
+	g_Slave_Address = slave_address;
+	g_Data_Len = data_len;
+	g_Data_Point = data_point;
+	// set comunication Timeout
+	set_tout_ms (I2C_TOUT);
+	// generate Start
+	I2C->CR2 |= I2C_CR2_START;
+	STATE = SB_01;
+	while (STATE != INI_00)
+		;
+	return 0;
 }
 
 /******************************************************************************
@@ -96,7 +124,7 @@ u8 I2C_WriteRegister(u16 u16_SlaveAdd, u8 u8_AddType, u8 u8_NoStop,
 	I2C->CR2 &= ~I2C_CR2_POS;
 	// setup I2C comm. in write
 	// copy parametters for interrupt routines
-	u8_NoStop_cpy = u8_NoStop;
+	g_RW_State = u8_NoStop;
 	g_Reg_Address = u8_AddType;
 	g_Slave_Address = u16_SlaveAdd;
 	g_Data_Len = u8_NumByteToWrite;
@@ -132,7 +160,7 @@ u8 I2C_ReadRegister(u16 u16_SlaveAdd, u8 u8_AddType, u8 u8_NoStop,
 	I2C->CR2 &= ~I2C_CR2_POS;
 	// setup I2C comm. in Read
 	// copy parametters for interrupt routines
-	u8_NoStop_cpy = u8_NoStop;
+	g_RW_State = u8_NoStop;
 	g_Reg_Address = u8_AddType;
 	g_Slave_Address = u16_SlaveAdd;
 	g_Data_Len = u8_NumByteToRead;
@@ -289,7 +317,7 @@ void I2CInterruptHandle(void) {
 				g_Data_Len--;
 				break;
 			} else {
-				if (u8_NoStop_cpy == 0) {
+				if (g_RW_State == 0) {
 					I2C->CR2 |= I2C_CR2_STOP;     // Generate stop here (STOP=1)
 				} else {
 					I2C->ITR = 0;                  // disable interrupt 
