@@ -26,6 +26,8 @@ $RECYCLE.BIN/
 
 .DS_Store
 .AppleDouble
+.out
+
 .LSOverride
 
 # Thumbnails
@@ -45,3 +47,20 @@ $RECYCLE.BIN/
 Network Trash Folder
 Temporary Items
 .apdisk
+*.out
+*.o
+*.cout
+settings/project.Debug.cspy.bat
+*.xcl
+*.pbi
+*.browse
+*.map
+*.db
+*.pbd
+*.dbgdt
+*.dni
+*.wsdt
+*.wspos
+/Debug/
+
+*.dep
