@@ -33,7 +33,6 @@ u8 u8_Direction;
 u8 u8_NumByte_cpy;
 u8* pu8_DataBuffer_cpy;
 u16 u16_SlaveAdd_cpy;
-u8 u8_AddType_cpy;
 u8 u8_NoStop_cpy;
 
 /******************************************************************************
@@ -101,7 +100,6 @@ u8 I2C_WriteRegister(u16 u16_SlaveAdd, u8 u8_AddType, u8 u8_NoStop,
 	u16_SlaveAdd_cpy = u16_SlaveAdd;
 	u8_NumByte_cpy = u8_NumByteToWrite;
 	pu8_DataBuffer_cpy = pu8_DataBuffer;
-	u8_AddType_cpy = u8_AddType;
 	// set comunication Timeout
 	set_tout_ms (I2C_TOUT);
 	// generate Start
@@ -135,7 +133,6 @@ u8 I2C_ReadRegister(u16 u16_SlaveAdd, u8 u8_AddType, u8 u8_NoStop,
 	u8_Direction = READ;
 	// copy parametters for interrupt routines
 	u8_NoStop_cpy = u8_NoStop;
-	u8_AddType_cpy = u8_AddType;
 	u16_SlaveAdd_cpy = u16_SlaveAdd;
 	u8_NumByte_cpy = u8_NumByteToRead;
 	pu8_DataBuffer_cpy = u8_DataBuffer;
@@ -173,22 +170,12 @@ void I2CInterruptHandle(void) {
 	if ((sr1 & I2C_SR1_SB) == 1) {
 		switch (STATE) {
 		case SB_01:
-			if (u8_AddType_cpy == TEN_BIT_ADDRESS) {
-				I2C->DR = (u8)(((u16_SlaveAdd_cpy >> 7) & 6) | 0xF0); // send header of 10-bit device address (R/W = 0)
-				STATE = ADD10_02;
-				break;
-			} else {
-				I2C->DR = (u8)(u16_SlaveAdd_cpy << 1); // send 7-bit device address & Write (R/W = 0)
-				STATE = ADDR_03;
-				break;
-			}
+			I2C->DR = (u8)(u16_SlaveAdd_cpy << 1); // send 7-bit device address & Write (R/W = 0)
+			STATE = ADDR_03;
+			break;
 
 		case SB_11:
-			if (u8_AddType_cpy == TEN_BIT_ADDRESS) {
-				I2C->DR = (u8)(((u16_SlaveAdd_cpy >> 7) & 6) | 0xF1); // send header of 10-bit device address (R/W = 1)
-			} else {
-				I2C->DR = (u8)(u16_SlaveAdd_cpy << 1) | 1; // send 7-bit device address & Write (R/W = 1)
-			}
+			I2C->DR = (u8)(u16_SlaveAdd_cpy << 1) | 1; // send 7-bit device address & Write (R/W = 1)
 			STATE = ADDR_13;
 			break;
 
@@ -197,20 +184,6 @@ void I2CInterruptHandle(void) {
 			break;
 		}
 
-	}
-
-	/* ADD10*/
-	if (I2C->SR1 & I2C_SR1_ADD10) {
-		switch (STATE) {
-		case ADD10_02:
-			I2C->DR = (u8)(u16_SlaveAdd_cpy); // send lower 8-bit device address & Write  
-			STATE = ADDR_03;
-			break;
-
-		default:
-			ErrProc();
-			break;
-		}
 	}
 
 	/* ADDR*/
