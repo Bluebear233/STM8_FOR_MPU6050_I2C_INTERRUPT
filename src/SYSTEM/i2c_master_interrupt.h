@@ -3,21 +3,8 @@
 
 #include "stm8s.h"
 
-#define MAX_DUMMY 10
-
-/* flag clearing sequence - uncoment next for peripheral clock under 2MHz */
-#define dead_time() { /* _asm("nop"); _asm("nop"); */ }
-
-#define I2C_TOUT  40
-
-#define delay(a)          { TIM4_tout= a; while(TIM4_tout); }
-#define tout()            (TIM4_tout)
-#define set_tout_ms(a)    { TIM4_tout= a; }
-
 #define WRITE 0
 #define READ  1
-#define SEV_BIT_ADDRESS 0
-#define TEN_BIT_ADDRESS 1
 
 // Define I2C STATE MACHINE :
 
@@ -28,6 +15,7 @@
 #define ADD10_02 02
 #define ADDR_03 03
 #define BTF_04 04
+#define BTF_05 05
 
 // Read states 1x
 #define SB_11 11
@@ -39,23 +27,10 @@
 #define BTF_17 17
 #define RXNE_18 18
 
-// Eval STM8/128-EVAL board constant 
-#define LED1  0x01
-#define LED2  0x02
-#define LED3  0x04
-#define LED4  0x08
-#define switch_on(msk) GPIOH->ODR &= ~(msk);
-#define switch_off(msk) GPIOH->ODR |= (msk);
-
 // Exported function 
 
 uint8_t I2C_Interrupt_Confing(void);
-void TIM4_Init1(void);
-void ErrProc(void);
-u8 I2C_WriteRegister(u16 u16_SlaveAdd, u8 u8_AddType, u8 u8_NoStop,
-		u8 u8_NumByteToWrite, u8 *pu8_DataBuffer);
-u8 I2C_ReadRegister(u16 u16_SlaveAdd, u8 u8_AddType, u8 u8_NoStop,
-		u8 u8_NumByteToRead, u8 *u8_DataBuffer);
+void I2CInterruptHandle(void);
 
 // Exported Interrupt handler 
 

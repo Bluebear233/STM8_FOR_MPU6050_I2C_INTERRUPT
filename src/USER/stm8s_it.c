@@ -450,7 +450,6 @@ INTERRUPT_HANDLER(TIM4_UPD_OVF_IRQHandler, 23)
 	/* In order to detect unexpected events during development,
 	 it is recommended to set a breakpoint on the following instruction.
 	 */
-	TIM4InterruptHandle();
 }
 #endif /*STM8S903*/
 

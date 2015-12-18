@@ -22,13 +22,7 @@
 
 // Global Variables definition
 
-u8 STATE;								// curent I2C states machine state
-volatile u8 err_state;  	// error state 
-volatile u8 err_save;   	// I2C->SR2 copy in case of error
-volatile u16 TIM4_tout;  // Timout Value  
-
-u8 u8_Direction;
-
+uint8_t STATE;								// curent I2C states machine stateW
 uint8_t g_Data_Len;
 uint8_t *g_Data_Point;
 uint8_t g_Slave_Address;
@@ -54,9 +48,7 @@ uint8_t I2C_Interrupt_Confing(void) {
 	enableInterrupts();
 
 	// Initialise I2C State Machine
-	err_save = 0;
 	STATE = INI_00;
-	set_tout_ms(0);
 
 	return 0;
 }
@@ -79,29 +71,12 @@ uint8_t I2C_Multiple_Write_With_Block(uint8_t slave_address,
 	g_Slave_Address = slave_address;
 	g_Data_Len = data_len;
 	g_Data_Point = data_point;
-	// set comunication Timeout
-	set_tout_ms (I2C_TOUT);
 	// generate Start
 	I2C->CR2 |= I2C_CR2_START;
 	STATE = SB_01;
 	while (STATE != INI_00)
 		;
 	return 0;
-}
-
-/******************************************************************************
- * Function name : ErrProc
- * Description 	: Managed Error durring I2C communication to be modified depending of final application
- * Input param 	: None
- * Return 		    : None
- * See also 		  : None.
- *******************************************************************************/
-void ErrProc(void) {
-	err_save = I2C->SR2;
-	err_state = STATE;
-	I2C->SR2 = 0;
-	STATE = INI_00;
-	set_tout_ms(0);
 }
 
 /******************************************************************************
@@ -132,8 +107,6 @@ uint8_t I2C_Multiple_Read_With_Block(uint8_t slave_address, uint8_t reg_address,
 	g_Slave_Address = slave_address;
 	g_Data_Len = data_len;
 	g_Data_Point = data_point;
-	// set comunication Timeout
-	set_tout_ms (I2C_TOUT);
 	I2C->CR2 |= I2C_CR2_START;
 	STATE = SB_01;
 	while (STATE != INI_00)
@@ -151,33 +124,22 @@ uint8_t I2C_Multiple_Read_With_Block(uint8_t slave_address, uint8_t reg_address,
  *******************************************************************************/
 void I2CInterruptHandle(void) {
 
-	u8 sr1, sr2, cr2;
+	uint8_t sr1;
 
 	/* Get Value of Status registers and Control register 2 */
 	sr1 = I2C->SR1;
-	sr2 = I2C->SR2;
-	cr2 = I2C->CR2;
-
-	/* Check for error in communication */
-	if (sr2 != 0) {
-		ErrProc();
-	}
 
 	/* Start bit detected */
 	if ((sr1 & I2C_SR1_SB) == 1) {
 		switch (STATE) {
 		case SB_01:
-			I2C->DR = (u8)(g_Slave_Address << 1); // send 7-bit device address & Write (R/W = 0)
+			I2C->DR = (g_Slave_Address << 1); // send 7-bit device address & Write (R/W = 0)
 			STATE = ADDR_03;
 			break;
 
 		case SB_11:
-			I2C->DR = (u8)(g_Slave_Address << 1) | 1; // send 7-bit device address & Write (R/W = 1)
+			I2C->DR = (g_Slave_Address << 1) | 1; // send 7-bit device address & Write (R/W = 1)
 			STATE = ADDR_13;
-			break;
-
-		default:
-			ErrProc();
 			break;
 		}
 
@@ -218,7 +180,6 @@ void I2CInterruptHandle(void) {
 				STATE = BTF_14;
 				break;
 			}
-			ErrProc();
 			break;
 
 		case ADDR_03:
@@ -226,11 +187,10 @@ void I2CInterruptHandle(void) {
 			/* Clear Add Ack Flag */
 			I2C->SR3;
 			I2C->DR = g_Reg_Address;
-			STATE = BTF_04;
-			break;
-
-		default:
-			ErrProc();
+			if (g_RW_State == WRITE)
+				STATE = BTF_04;
+			else
+				STATE = BTF_05;
 			break;
 
 		}
@@ -241,12 +201,10 @@ void I2CInterruptHandle(void) {
 		case RXNE_18:
 			*(g_Data_Point++) = I2C->DR;			// Read next data byte
 			STATE = INI_00;
-			set_tout_ms(0);
 			break;
 		case RXNE_16:
 			*(g_Data_Point++) = I2C->DR;            // Read next data byte
 			STATE = INI_00;
-			set_tout_ms(0);
 			break;
 		}
 		I2C->ITR &= ~I2C_ITR_ITBUFEN;  // Disable Buffer interrupts (errata)
@@ -260,7 +218,6 @@ void I2CInterruptHandle(void) {
 			*(g_Data_Point++) = I2C->DR;			// Read next data byte
 			*(g_Data_Point++) = I2C->DR;			// Read next data byte
 			STATE = INI_00;
-			set_tout_ms(0);
 			break;
 
 		case BTF_14:
@@ -280,62 +237,22 @@ void I2CInterruptHandle(void) {
 			break;
 
 		case BTF_04:
-			if ((g_RW_State == WRITE)
-					&& (g_Data_Len) &&((I2C->SR1 & I2C_SR1_TXE) == I2C_SR1_TXE)) {
+			if ((g_Data_Len) &&((I2C->SR1 & I2C_SR1_TXE) == I2C_SR1_TXE)) {
 				I2C->DR = *g_Data_Point++;		// Write next data byte
 				g_Data_Len--;
-				break;
 			} else {
-				if (g_RW_State == WRITE) {
-					I2C->CR2 |= I2C_CR2_STOP;     // Generate stop here (STOP=1)
-					STATE = INI_00;
-					set_tout_ms(0);
-					break;
-				} else {
-					I2C->CR2 |= 1;
-					STATE = SB_11;
-					I2C->ITR |= 3;
-					break;
-				}
+				I2C->CR2 |= I2C_CR2_STOP;     // Generate stop here (STOP=1)
+				STATE = INI_00;
 			}
+			break;
+
+		case BTF_05:
+			I2C->CR2 |= 1;
+			STATE = SB_11;
+			I2C->ITR |= 3;
+			break;
+
 		}
 	}
-}
-
-/******************************************************************************
- * Function name : TIM4_Init
- * Description 	: Initialize TIM4 peripheral
- * Input param 	: None
- * Return 		    : None
- * See also 		  : None
- *******************************************************************************/
-void TIM4_Init1(void) {
-	CLK->PCKENR1 |= 4;               // TIM4 clock enable
-
-	TIM4->ARR = 0x80;                // init timer4 1ms interrupts
-	TIM4->PSCR = 7;
-	TIM4->IER = 1;
-	TIM4->CR1 |= 1;
-}
-
-/******************************************************************************
- * Function name : TIM4InterruptHandle
- * Description 	: Testing load for Main 
- * Input param 	: None
- * Return 		    : None
- * See also 		  : None
- *******************************************************************************/
-void TIM4InterruptHandle(void) {
-
-	u8 dly = 10;
-
-	TIM4->SR1 = 0;
-
-	if (TIM4_tout)
-		if (--TIM4_tout == 0) {
-			ErrProc();
-		}
-	while (dly--)
-		;
 }
 
