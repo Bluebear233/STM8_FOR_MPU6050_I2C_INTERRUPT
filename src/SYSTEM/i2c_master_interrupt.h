@@ -18,8 +18,6 @@
 #define READ  1
 #define SEV_BIT_ADDRESS 0
 #define TEN_BIT_ADDRESS 1
-#define STOP 0
-#define NOSTOP 1
 
 // Define I2C STATE MACHINE :
 
@@ -51,7 +49,7 @@
 
 // Exported function 
 
-void I2C_Interrupt_Confing(void);
+uint8_t I2C_Interrupt_Confing(void);
 void TIM4_Init1(void);
 void ErrProc(void);
 u8 I2C_WriteRegister(u16 u16_SlaveAdd, u8 u8_AddType, u8 u8_NoStop,

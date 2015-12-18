@@ -42,7 +42,7 @@ uint8_t g_RW_State;
  * Return 		    : None
  * See also 		  : None
  *******************************************************************************/
-void I2C_Interrupt_Confing(void) {
+uint8_t I2C_Interrupt_Confing(void) {
 
 	I2C_DeInit();
 
@@ -51,10 +51,14 @@ void I2C_Interrupt_Confing(void) {
 
 	I2C_ITConfig(I2C_IT_ERR | I2C_ITR_ITEVTEN, ENABLE);
 
+	enableInterrupts();
+
 	// Initialise I2C State Machine
 	err_save = 0;
 	STATE = INI_00;
 	set_tout_ms(0);
+
+	return 0;
 }
 uint8_t I2C_Multiple_Write_With_Block(uint8_t slave_address,
 		uint8_t reg_address, uint8_t data_len, u8 *data_point) {
@@ -64,14 +68,13 @@ uint8_t I2C_Multiple_Write_With_Block(uint8_t slave_address,
 	//等待I2C空闲
 	while ((I2C->SR3 & I2C_SR3_BUSY) == I2C_SR3_BUSY)
 		;
-
 	// set ACK
 	I2C->CR2 |= I2C_CR2_ACK;
 	// reset POS
 	I2C->CR2 &= ~I2C_CR2_POS;
 	// setup I2C comm. in write
 	// copy parametters for interrupt routines
-	g_RW_State = STOP;
+	g_RW_State = WRITE;
 	g_Reg_Address = reg_address;
 	g_Slave_Address = slave_address;
 	g_Data_Len = data_len;
@@ -102,42 +105,6 @@ void ErrProc(void) {
 }
 
 /******************************************************************************
- * Function name : I2C_WriteRegister
- * Description 	: write defined number bytes to slave memory starting with defined offset
- * Input param 	: Slave Address ; Address type (TEN_BIT_ADDRESS or SEV_BIT_ADDRESS) ; STOP/NOSTOP ;
- *									Number byte to Write ; address of the application send buffer
- * Return 		    : 0 : START Writing not performed -> Communication onging on the bus
- *                 1 : START Writing performed 
- * See also 		  : None.
- *******************************************************************************/
-u8 I2C_WriteRegister(u16 u16_SlaveAdd, u8 u8_AddType, u8 u8_NoStop,
-		u8 u8_NumByteToWrite, u8 *pu8_DataBuffer) {
-	// check if communication on going
-	if ((I2C->SR3 & I2C_SR3_BUSY) == I2C_SR3_BUSY)
-		return 0;
-	// check if STATE MACHINE is in state INI_00
-	if (STATE != INI_00)
-		return 0;
-	// set ACK
-	I2C->CR2 |= I2C_CR2_ACK;
-	// reset POS
-	I2C->CR2 &= ~I2C_CR2_POS;
-	// setup I2C comm. in write
-	// copy parametters for interrupt routines
-	g_RW_State = u8_NoStop;
-	g_Reg_Address = u8_AddType;
-	g_Slave_Address = u16_SlaveAdd;
-	g_Data_Len = u8_NumByteToWrite;
-	g_Data_Point = pu8_DataBuffer;
-	// set comunication Timeout
-	set_tout_ms (I2C_TOUT);
-	// generate Start
-	I2C->CR2 |= I2C_CR2_START;
-	STATE = SB_01;
-	return 1;
-}
-
-/******************************************************************************
  * Function name : I2C_ReadRegister
  * Description 	: Read defined number bytes from slave memory starting with defined offset
  * Input param 	: Slave Address ; Address type (TEN_BIT_ADDRESS or SEV_BIT_ADDRESS) ; STOP/NOSTOP ;
@@ -146,32 +113,33 @@ u8 I2C_WriteRegister(u16 u16_SlaveAdd, u8 u8_AddType, u8 u8_NoStop,
  *                 1 : START Reading performed 
  * See also 		  : None
  *******************************************************************************/
-u8 I2C_ReadRegister(u16 u16_SlaveAdd, u8 u8_AddType, u8 u8_NoStop,
-		u8 u8_NumByteToRead, u8 *u8_DataBuffer) {
-	// check if communication on going
-	if (((I2C->SR3 & I2C_SR3_BUSY) == I2C_SR3_BUSY) && (u8_NoStop == 0))
-		return 0;
-	// check if STATE MACHINE is in state INI_00
-	if (STATE != INI_00)
-		return 0;
+uint8_t I2C_Multiple_Read_With_Block(uint8_t slave_address, uint8_t reg_address,
+		u8 data_len, u8 *data_point) {
+	//等待上次通信结束
+	while (STATE != INI_00)
+		;
+	//等待I2C空闲
+	while ((I2C->SR3 & I2C_SR3_BUSY) == I2C_SR3_BUSY)
+		;
 	// set ACK
 	I2C->CR2 |= I2C_CR2_ACK;
 	// reset POS
 	I2C->CR2 &= ~I2C_CR2_POS;
 	// setup I2C comm. in Read
 	// copy parametters for interrupt routines
-	g_RW_State = u8_NoStop;
-	g_Reg_Address = u8_AddType;
-	g_Slave_Address = u16_SlaveAdd;
-	g_Data_Len = u8_NumByteToRead;
-	g_Data_Point = u8_DataBuffer;
+	g_RW_State = READ;
+	g_Reg_Address = reg_address;
+	g_Slave_Address = slave_address;
+	g_Data_Len = data_len;
+	g_Data_Point = data_point;
 	// set comunication Timeout
 	set_tout_ms (I2C_TOUT);
-	//generate Start
-	I2C->CR2 |= 1;
-	STATE = SB_11;
-	I2C->ITR |= 3;                  // re-enable interrupt
-	return 1;
+	I2C->CR2 |= I2C_CR2_START;
+	STATE = SB_01;
+	while (STATE != INI_00)
+		;
+
+	return 0;
 }
 
 /******************************************************************************
@@ -312,19 +280,23 @@ void I2CInterruptHandle(void) {
 			break;
 
 		case BTF_04:
-			if ((g_Data_Len) &&((I2C->SR1 & I2C_SR1_TXE) == I2C_SR1_TXE)) {
+			if ((g_RW_State == WRITE)
+					&& (g_Data_Len) &&((I2C->SR1 & I2C_SR1_TXE) == I2C_SR1_TXE)) {
 				I2C->DR = *g_Data_Point++;		// Write next data byte
 				g_Data_Len--;
 				break;
 			} else {
-				if (g_RW_State == 0) {
+				if (g_RW_State == WRITE) {
 					I2C->CR2 |= I2C_CR2_STOP;     // Generate stop here (STOP=1)
+					STATE = INI_00;
+					set_tout_ms(0);
+					break;
 				} else {
-					I2C->ITR = 0;                  // disable interrupt 
+					I2C->CR2 |= 1;
+					STATE = SB_11;
+					I2C->ITR |= 3;
+					break;
 				}
-				STATE = INI_00;
-				set_tout_ms(0);
-				break;
 			}
 		}
 	}
