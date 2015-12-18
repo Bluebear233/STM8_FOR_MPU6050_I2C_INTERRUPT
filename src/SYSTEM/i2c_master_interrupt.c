@@ -27,12 +27,12 @@ volatile u8 err_state;  	// error state
 volatile u8 err_save;   	// I2C->SR2 copy in case of error
 volatile u16 TIM4_tout;  // Timout Value  
 
-u8 u8_regAddr;
 u8 u8_Direction;
 
-u8 u8_NumByte_cpy;
-u8* pu8_DataBuffer_cpy;
-u16 u16_SlaveAdd_cpy;
+uint8_t g_Data_Len;
+uint8_t *g_Data_Point;
+uint8_t g_Slave_Address;
+
 u8 u8_NoStop_cpy;
 
 /******************************************************************************
@@ -94,12 +94,11 @@ u8 I2C_WriteRegister(u16 u16_SlaveAdd, u8 u8_AddType, u8 u8_NoStop,
 	// reset POS
 	I2C->CR2 &= ~I2C_CR2_POS;
 	// setup I2C comm. in write
-	u8_Direction = WRITE;
 	// copy parametters for interrupt routines
 	u8_NoStop_cpy = u8_NoStop;
-	u16_SlaveAdd_cpy = u16_SlaveAdd;
-	u8_NumByte_cpy = u8_NumByteToWrite;
-	pu8_DataBuffer_cpy = pu8_DataBuffer;
+	g_Slave_Address = u16_SlaveAdd;
+	g_Data_Len = u8_NumByteToWrite;
+	g_Data_Point = pu8_DataBuffer;
 	// set comunication Timeout
 	set_tout_ms (I2C_TOUT);
 	// generate Start
@@ -130,12 +129,11 @@ u8 I2C_ReadRegister(u16 u16_SlaveAdd, u8 u8_AddType, u8 u8_NoStop,
 	// reset POS
 	I2C->CR2 &= ~I2C_CR2_POS;
 	// setup I2C comm. in Read
-	u8_Direction = READ;
 	// copy parametters for interrupt routines
 	u8_NoStop_cpy = u8_NoStop;
-	u16_SlaveAdd_cpy = u16_SlaveAdd;
-	u8_NumByte_cpy = u8_NumByteToRead;
-	pu8_DataBuffer_cpy = u8_DataBuffer;
+	g_Slave_Address = u16_SlaveAdd;
+	g_Data_Len = u8_NumByteToRead;
+	g_Data_Point = u8_DataBuffer;
 	// set comunication Timeout
 	set_tout_ms (I2C_TOUT);
 	//generate Start
@@ -170,12 +168,12 @@ void I2CInterruptHandle(void) {
 	if ((sr1 & I2C_SR1_SB) == 1) {
 		switch (STATE) {
 		case SB_01:
-			I2C->DR = (u8)(u16_SlaveAdd_cpy << 1); // send 7-bit device address & Write (R/W = 0)
+			I2C->DR = (u8)(g_Slave_Address << 1); // send 7-bit device address & Write (R/W = 0)
 			STATE = ADDR_03;
 			break;
 
 		case SB_11:
-			I2C->DR = (u8)(u16_SlaveAdd_cpy << 1) | 1; // send 7-bit device address & Write (R/W = 1)
+			I2C->DR = (u8)(g_Slave_Address << 1) | 1; // send 7-bit device address & Write (R/W = 1)
 			STATE = ADDR_13;
 			break;
 
@@ -191,13 +189,13 @@ void I2CInterruptHandle(void) {
 		switch (STATE) {
 		case ADDR_13:
 
-			if (u8_NumByte_cpy == 3) {
+			if (g_Data_Len == 3) {
 				I2C->SR3;
 				STATE = BTF_15;
 				break;
 			}
 
-			if (u8_NumByte_cpy == 2) {
+			if (g_Data_Len == 2) {
 				// set POS bit
 				I2C->CR2 |= I2C_CR2_POS;
 				/* Clear Add Ack Flag */
@@ -207,7 +205,7 @@ void I2CInterruptHandle(void) {
 				STATE = BTF_17;
 				break;
 			}
-			if (u8_NumByte_cpy == 1) {
+			if (g_Data_Len == 1) {
 				I2C->CR2 &= ~I2C_CR2_ACK;
 				/* Clear Add Ack Flag */
 				I2C->SR3;
@@ -216,7 +214,7 @@ void I2CInterruptHandle(void) {
 				STATE = RXNE_18;
 				break;
 			}
-			if (u8_NumByte_cpy > 3) {
+			if (g_Data_Len > 3) {
 				I2C->SR3;
 				STATE = BTF_14;
 				break;
@@ -228,8 +226,8 @@ void I2CInterruptHandle(void) {
 
 			/* Clear Add Ack Flag */
 			I2C->SR3;
-			I2C->DR = *pu8_DataBuffer_cpy++;
-			u8_NumByte_cpy--;
+			I2C->DR = *g_Data_Point++;
+			g_Data_Len--;
 			STATE = BTF_04;
 			break;
 
@@ -243,12 +241,12 @@ void I2CInterruptHandle(void) {
 	if ((sr1 & I2C_SR1_RXNE) == I2C_SR1_RXNE) {
 		switch (STATE) {
 		case RXNE_18:
-			*(pu8_DataBuffer_cpy++) = I2C->DR;			// Read next data byte
+			*(g_Data_Point++) = I2C->DR;			// Read next data byte
 			STATE = INI_00;
 			set_tout_ms(0);
 			break;
 		case RXNE_16:
-			*(pu8_DataBuffer_cpy++) = I2C->DR;            // Read next data byte
+			*(g_Data_Point++) = I2C->DR;            // Read next data byte
 			STATE = INI_00;
 			set_tout_ms(0);
 			break;
@@ -261,32 +259,32 @@ void I2CInterruptHandle(void) {
 		switch (STATE) {
 		case BTF_17:
 			I2C->CR2 |= I2C_CR2_STOP;     // generate stop request here (STOP=1)
-			*(pu8_DataBuffer_cpy++) = I2C->DR;			// Read next data byte
-			*(pu8_DataBuffer_cpy++) = I2C->DR;			// Read next data byte
+			*(g_Data_Point++) = I2C->DR;			// Read next data byte
+			*(g_Data_Point++) = I2C->DR;			// Read next data byte
 			STATE = INI_00;
 			set_tout_ms(0);
 			break;
 
 		case BTF_14:
-			*(pu8_DataBuffer_cpy++) = I2C->DR;
-			u8_NumByte_cpy--;
-			if (u8_NumByte_cpy <= 3)
+			*(g_Data_Point++) = I2C->DR;
+			g_Data_Len--;
+			if (g_Data_Len <= 3)
 				STATE = BTF_15;
 			break;
 
 		case BTF_15:
 			I2C->CR2 &= ~I2C_CR2_ACK;                     	// Set NACK (ACK=0)
-			*(pu8_DataBuffer_cpy++) = I2C->DR;            // Read next data byte
+			*(g_Data_Point++) = I2C->DR;            // Read next data byte
 			I2C->CR2 |= I2C_CR2_STOP;             // Generate stop here (STOP=1)
-			*(pu8_DataBuffer_cpy++) = I2C->DR;            // Read next data byte
+			*(g_Data_Point++) = I2C->DR;            // Read next data byte
 			I2C->ITR |= I2C_ITR_ITBUFEN; 	// Enable Buffer interrupts (errata)
 			STATE = RXNE_16;
 			break;
 
 		case BTF_04:
-			if ((u8_NumByte_cpy) &&((I2C->SR1 & I2C_SR1_TXE) == I2C_SR1_TXE)) {
-				I2C->DR = *pu8_DataBuffer_cpy++;		// Write next data byte
-				u8_NumByte_cpy--;
+			if ((g_Data_Len) &&((I2C->SR1 & I2C_SR1_TXE) == I2C_SR1_TXE)) {
+				I2C->DR = *g_Data_Point++;		// Write next data byte
+				g_Data_Len--;
 				break;
 			} else {
 				if (u8_NoStop_cpy == 0) {
