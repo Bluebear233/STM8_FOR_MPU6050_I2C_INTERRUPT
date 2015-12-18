@@ -43,11 +43,11 @@ u8 u8_NoStop_cpy;
  * Return 		    : None
  * See also 		  : None
  *******************************************************************************/
-void I2C_Init1(void) {
+void I2C_Interrupt_Confing(void) {
 
 	I2C_DeInit();
 
-	I2C_Init(400000, 0x0000, I2C_DUTYCYCLE_2, I2C_ACK_CURR, I2C_ADDMODE_7BIT,
+	I2C_Init(400000, 0x0000, I2C_DUTYCYCLE_16_9, I2C_ACK_CURR, I2C_ADDMODE_7BIT,
 			16);
 
 	I2C_ITConfig(I2C_IT_ERR | I2C_ITR_ITEVTEN, ENABLE);

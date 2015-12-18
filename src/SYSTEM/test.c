@@ -9,11 +9,9 @@
 #include "test.h"
 
 uint8_t I2C_Config() {
-	// initialize timer 4 mandatory for I2C timout measurement
-	TIM4_Init1();
 
 	// Initialize I2C for communication
-	I2C_Init1();
+	I2C_Interrupt_Confing();
 
 	// Enable all interrupt
 	enableInterrupts();
@@ -28,8 +26,8 @@ uint8_t I2C_Multiple_Read(uint8_t slave_address, uint8_t reg_address,
 	while (!I2C_ReadRegister(slave_address, SEV_BIT_ADDRESS, NOSTOP, read_len,
 			buff_point))
 		;
-        
-        extern uint8_t STATE;
+
+	extern uint8_t STATE;
 
 	while (STATE != INI_00)
 		;
@@ -50,8 +48,8 @@ uint8_t I2C_Multiple_Write(uint8_t slave_address, uint8_t reg_address,
 	while (!I2C_WriteRegister(slave_address, SEV_BIT_ADDRESS, STOP,
 			data_len + 1, buf))
 		;
-        extern uint8_t STATE;
-        while (STATE != INI_00)
+	extern uint8_t STATE;
+	while (STATE != INI_00)
 		;
 
 	return 0;

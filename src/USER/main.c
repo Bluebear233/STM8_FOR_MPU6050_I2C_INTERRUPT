@@ -51,7 +51,7 @@
  */
 void main(void) {
 	/* System Init */
-	CLK_SYSCLKConfig (CLK_PRESCALER_HSIDIV2);
+	CLK_SYSCLKConfig (CLK_PRESCALER_HSIDIV1);
 
 	delay_init();
 

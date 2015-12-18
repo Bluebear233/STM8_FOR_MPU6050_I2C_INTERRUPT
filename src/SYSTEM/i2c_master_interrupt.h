@@ -51,7 +51,7 @@
 
 // Exported function 
 
-void I2C_Init1(void);
+void I2C_Interrupt_Confing(void);
 void TIM4_Init1(void);
 void ErrProc(void);
 u8 I2C_WriteRegister(u16 u16_SlaveAdd, u8 u8_AddType, u8 u8_NoStop,
