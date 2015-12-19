@@ -20,8 +20,8 @@
  */
 
 /* Includes ------------------------------------------------------------------*/
+#include <I2C_INTERRUPT.h>
 #include "stm8s_it.h"
-#include "i2c_master_interrupt.h"
 
 /** @addtogroup I2C_EEPROM
  * @{
@@ -344,7 +344,7 @@ INTERRUPT_HANDLER(I2C_IRQHandler, 19)
 	/* In order to detect unexpected events during development,
 	 it is recommended to set a breakpoint on the following instruction.
 	 */
-	I2CInterruptHandle();
+	I2C_Interrupt_Handle();
 }
 
 #if defined(STM8S105) || defined(STM8S005) ||  defined (STM8AF626x)
@@ -450,8 +450,7 @@ INTERRUPT_HANDLER(TIM4_UPD_OVF_IRQHandler, 23)
 	/* In order to detect unexpected events during development,
 	 it is recommended to set a breakpoint on the following instruction.
 	 */
-	void I2C_Timer_Interrupt_Handler();
-	I2C_Timer_Interrupt_Handler();
+	I2C_Timer_Interrupt_Handle();
 }
 #endif /*STM8S903*/
 

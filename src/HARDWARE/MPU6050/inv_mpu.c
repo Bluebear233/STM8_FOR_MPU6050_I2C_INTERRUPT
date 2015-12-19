@@ -41,9 +41,9 @@
  * min(int a, int b)
  */
 #if defined MOTION_DRIVER_TARGET_MSP430
-#include "test.h"
 #include "delay.h"
-#define MPU_IIC_Init I2C_Interrupt_Confing
+#include "I2C_INTERRUPT.h"
+#define MPU_IIC_Init() I2C_Interrupt_Confing(400000)
 #define i2c_write(a,b,c,d)   I2C_Multiple_Write_With_Block(a,b,d,c)
 #define i2c_read(a,b,c,d)   I2C_Multiple_Read_With_Block(a,b,d,c)
 #define delay_ms    delay_ms

@@ -1667,7 +1667,7 @@
       <name>$PROJ_DIR$\src\SYSTEM\delay.c</name>
     </file>
     <file>
-      <name>$PROJ_DIR$\src\SYSTEM\i2c_master_interrupt.c</name>
+      <name>$PROJ_DIR$\src\SYSTEM\I2C_INTERRUPT.c</name>
     </file>
     <file>
       <name>$PROJ_DIR$\src\SYSTEM\TIM4.c</name>

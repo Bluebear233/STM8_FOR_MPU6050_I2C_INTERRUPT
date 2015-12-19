@@ -20,12 +20,11 @@
  */
 
 /* Includes ------------------------------------------------------------------*/
+#include <I2C_INTERRUPT.h>
 #include "USART.h"
 #include "delay.h"
-#include "i2c_master_interrupt.h"
 #include "stm8s.h"
 #include "inv_mpu.h"
-#include "test.h"
 #include <stdio.h>
 
 /**
