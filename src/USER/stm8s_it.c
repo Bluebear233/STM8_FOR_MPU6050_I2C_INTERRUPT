@@ -450,6 +450,8 @@ INTERRUPT_HANDLER(TIM4_UPD_OVF_IRQHandler, 23)
 	/* In order to detect unexpected events during development,
 	 it is recommended to set a breakpoint on the following instruction.
 	 */
+	void I2C_Timer_Interrupt_Handler();
+	I2C_Timer_Interrupt_Handler();
 }
 #endif /*STM8S903*/
 

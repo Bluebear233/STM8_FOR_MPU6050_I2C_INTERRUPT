@@ -1670,6 +1670,9 @@
       <name>$PROJ_DIR$\src\SYSTEM\i2c_master_interrupt.c</name>
     </file>
     <file>
+      <name>$PROJ_DIR$\src\SYSTEM\TIM4.c</name>
+    </file>
+    <file>
       <name>$PROJ_DIR$\src\SYSTEM\USART.c</name>
     </file>
   </group>
