@@ -2,22 +2,26 @@
  ******************************************************************************
  * @file     src/SYSTEM/I2C_INTERRUPT.c
  * @author   luzhipeng
- * @version  V1.0
+ * @version  V1.2
  * @date     19-Dec-2015
  * @brief    This file containsall the functions for I2C Communication.
  ******************************************************************************
  @par How to use it ?
 
  1.实现Hard I2C PIN的硬件I2C引脚定义
- 2.实现Timer Define的函数定义，定时器的中断优先级为3
+ 2.实现Timer Define的函数定义，定时器的中断优先级为3,定时器中断频率为1000HZ
  3.根据所需功能实现Funtions Define
  4.如果要从中断里调用I2C通信要确保该中断的优先级为1
  5.将I2C_Timer_Interrupt_Handle()和I2C_Interrupt_Handle()加入到中断函数里
  6.定义了DEBUG，应在I2C初始化前先初始化串口
+ 7.非阻塞函数使用时要注意是否会出现临界状态，如果传入的指针请确保I2C已经读写完毕方可修改
+ 通过I2C_Get_Communication_Complete()函数查询读写是否完毕，切记。
 
  @updata
 
  v1.0：新建
+ v1.1：在I2C中断增加定时器状态判断
+ v1.2：增加非阻塞的读写，
 
 
  */
@@ -33,10 +37,11 @@
 #define I2C_SCL_PIN GPIO_PIN_4
 
 /* Timer Define --------------------------------------------------------------*/
-#define I2C_Timer_Config      TIM4_Config
-#define I2C_Timer_Set_Count() TIM4_SetCounter(0)
-#define I2C_Timer_Clear_IT()  TIM4_ClearITPendingBit(TIM4_IT_UPDATE)
-#define I2C_Timer_Cmd(state)  TIM4_Cmd(state)
+#define I2C_Timer_Config          TIM4_Config
+#define I2C_Timer_Set_1ms_Count() TIM4_SetCounter(0)
+#define I2C_Timer_Clear_IT()      TIM4_ClearITPendingBit(TIM4_IT_UPDATE)
+#define I2C_Timer_Cmd(state)      TIM4_Cmd(state)
+#define I2C_Timer_Get_On_State()  (TIM4->CR1&TIM4_CR1_CEN)
 
 /* Funtions Define -----------------------------------------------------------*/
 #define DEBUG
@@ -127,12 +132,12 @@ uint8_t I2C_Multiple_Write_With_Block(uint8_t slave_address,
 	//等待上次通信结束
 	while (g_STATE != INI_00)
 		;
-	I2C_Timer_Set_Count();
+	I2C_Timer_Set_1ms_Count();
 	I2C_Timer_Cmd(ENABLE);
 	//等待I2C空闲
 	while ((I2C->SR3 & I2C_SR3_BUSY) == I2C_SR3_BUSY)
 		;
-	I2C_Timer_Set_Count();
+	I2C_Timer_Set_1ms_Count();
 	// copy parametters for interrupt routines
 	g_RW_State = WRITE;
 	g_Reg_Address = reg_address;
@@ -161,12 +166,12 @@ uint8_t I2C_Multiple_Read_With_Block(uint8_t slave_address, uint8_t reg_address,
 	//等待上次通信结束
 	while (g_STATE != INI_00)
 		;
-	I2C_Timer_Set_Count();
+	I2C_Timer_Set_1ms_Count();
 	I2C_Timer_Cmd(ENABLE);
 	//等待I2C空闲
 	while ((I2C->SR3 & I2C_SR3_BUSY) == I2C_SR3_BUSY)
 		;
-	I2C_Timer_Set_Count();
+	I2C_Timer_Set_1ms_Count();
 	// set ACK
 	I2C->CR2 |= I2C_CR2_ACK;
 	// reset POS
@@ -187,6 +192,81 @@ uint8_t I2C_Multiple_Read_With_Block(uint8_t slave_address, uint8_t reg_address,
 	return 0;
 }
 /**
+ * @brief I2C Multiple Write Without Block
+ * @param  slave_address : slave address.
+ * @param  reg_address : register address.
+ * @param  buff_point ： want to read buffer point
+ * @param  data_len : write data lenght
+ * @retval communication state 0 is ok
+ */
+uint8_t I2C_Multiple_Write_Without_Block(uint8_t slave_address,
+		uint8_t reg_address, uint8_t *data_point, uint8_t data_len) {
+	//等待上次通信结束
+	while (g_STATE != INI_00)
+		;
+	I2C_Timer_Set_1ms_Count();
+	I2C_Timer_Cmd(ENABLE);
+	//等待I2C空闲
+	while ((I2C->SR3 & I2C_SR3_BUSY) == I2C_SR3_BUSY)
+		;
+	I2C_Timer_Set_1ms_Count();
+	// copy parametters for interrupt routines
+	g_RW_State = WRITE;
+	g_Reg_Address = reg_address;
+	g_Slave_Address = slave_address;
+	g_Data_Len = data_len;
+	g_Data_Point = data_point;
+	// generate Start
+	I2C->CR2 |= I2C_CR2_START;
+	g_STATE = SB_01;
+
+	return 0;
+}
+
+/**
+ * @brief  I2C Multiple Read Without Block
+ * @param  slave_address : slave address.
+ * @param  reg_address : register address.
+ * @param  buff_point ： want to write buffer point
+ * @param  data_len : read lenght
+ * @retval communication state 0 is ok
+ */
+uint8_t I2C_Multiple_Read_Without_Block(uint8_t slave_address,
+		uint8_t reg_address, uint8_t *data_point, uint8_t data_len) {
+	//等待上次通信结束
+	while (g_STATE != INI_00)
+		;
+	I2C_Timer_Set_1ms_Count();
+	I2C_Timer_Cmd(ENABLE);
+	//等待I2C空闲
+	while ((I2C->SR3 & I2C_SR3_BUSY) == I2C_SR3_BUSY)
+		;
+	I2C_Timer_Set_1ms_Count();
+	// set ACK
+	I2C->CR2 |= I2C_CR2_ACK;
+	// reset POS
+	I2C->CR2 &= ~I2C_CR2_POS;
+	// setup I2C comm. in Read
+	// copy parametters for interrupt routines
+	g_RW_State = READ;
+	g_Reg_Address = reg_address;
+	g_Slave_Address = slave_address;
+	g_Data_Len = data_len;
+	g_Data_Point = data_point;
+	I2C->CR2 |= I2C_CR2_START;
+	g_STATE = SB_01;
+
+	return 0;
+}
+/**
+ * @brief I2C get communication complete
+ * @retval  1 - Complete
+ *          0 - Communicaing
+ */
+uint8_t I2C_Get_Communication_Complete(void) {
+	return (g_STATE == INI_00 ? 1 : 0);
+}
+/**
  * @brief I2C_Interrupt_Handle
  */
 void I2C_Interrupt_Handle(void) {
@@ -194,20 +274,23 @@ void I2C_Interrupt_Handle(void) {
 
 	/* Get Value of Status registers and Control register 2 */
 	sr1 = I2C->SR1;
-	I2C->SR2;
-	I2C->SR3;
+
+	if (!I2C_Timer_Get_On_State()) {
+		I2C_Timer_Set_1ms_Count();
+		I2C_Timer_Cmd(ENABLE);
+	}
 
 	/* Start bit detected */
 	if ((sr1 & I2C_SR1_SB) == I2C_SR1_SB) {
 		switch (g_STATE) {
 		case SB_01:
-			I2C_Timer_Set_Count();
+			I2C_Timer_Set_1ms_Count();
 			I2C->DR = (g_Slave_Address << 1); // send 7-bit device address & Write (R/W = 0)
 			g_STATE = ADDR_03;
 			break;
 
 		case SB_11:
-			I2C_Timer_Set_Count();
+			I2C_Timer_Set_1ms_Count();
 			I2C->DR = (g_Slave_Address << 1) | 1; // send 7-bit device address & Write (R/W = 1)
 			g_STATE = ADDR_13;
 			break;
@@ -221,7 +304,7 @@ void I2C_Interrupt_Handle(void) {
 		case ADDR_13:
 			switch (g_Data_Len) {
 			case 1:
-				I2C_Timer_Set_Count();
+				I2C_Timer_Set_1ms_Count();
 				I2C->CR2 &= ~I2C_CR2_ACK;
 				/* Clear Add Ack Flag */
 				I2C->SR3;
@@ -230,7 +313,7 @@ void I2C_Interrupt_Handle(void) {
 				g_STATE = RXNE_18;
 				break;
 			case 2:
-				I2C_Timer_Set_Count();
+				I2C_Timer_Set_1ms_Count();
 				// set POS bit
 				I2C->CR2 |= I2C_CR2_POS;
 				/* Clear Add Ack Flag */
@@ -240,12 +323,12 @@ void I2C_Interrupt_Handle(void) {
 				g_STATE = BTF_17;
 				break;
 			case 3:
-				I2C_Timer_Set_Count();
+				I2C_Timer_Set_1ms_Count();
 				I2C->SR3;
 				g_STATE = BTF_15;
 				break;
 			default:
-				I2C_Timer_Set_Count();
+				I2C_Timer_Set_1ms_Count();
 				I2C->SR3;
 				g_STATE = BTF_14;
 				break;
@@ -254,7 +337,7 @@ void I2C_Interrupt_Handle(void) {
 
 		case ADDR_03:
 			/* Clear Add Ack Flag */
-			I2C_Timer_Set_Count();
+			I2C_Timer_Set_1ms_Count();
 			I2C->SR3;
 			I2C->DR = g_Reg_Address;
 			if (g_RW_State == WRITE)
@@ -294,7 +377,7 @@ void I2C_Interrupt_Handle(void) {
 			break;
 
 		case BTF_14:
-			I2C_Timer_Set_Count();
+			I2C_Timer_Set_1ms_Count();
 			*(g_Data_Point++) = I2C->DR;
 			g_Data_Len--;
 			if (g_Data_Len <= 3)
@@ -302,7 +385,7 @@ void I2C_Interrupt_Handle(void) {
 			break;
 
 		case BTF_15:
-			I2C_Timer_Set_Count();
+			I2C_Timer_Set_1ms_Count();
 			I2C->CR2 &= ~I2C_CR2_ACK;     // Set NACK (ACK=0)
 			*(g_Data_Point++) = I2C->DR;     // Read next data byte
 			I2C->CR2 |= I2C_CR2_STOP;     // Generate stop here (STOP=1)
@@ -313,7 +396,7 @@ void I2C_Interrupt_Handle(void) {
 
 		case BTF_04:
 			if ((g_Data_Len) &&((I2C->SR1 & I2C_SR1_TXE) == I2C_SR1_TXE)) {
-				I2C_Timer_Set_Count();
+				I2C_Timer_Set_1ms_Count();
 				I2C->DR = *g_Data_Point++;		// Write next data byte
 				g_Data_Len--;
 			} else {
@@ -324,7 +407,7 @@ void I2C_Interrupt_Handle(void) {
 			break;
 
 		case BTF_05:
-			I2C_Timer_Set_Count();
+			I2C_Timer_Set_1ms_Count();
 			I2C->CR2 |= 1;
 			g_STATE = SB_11;
 			I2C->ITR |= 3;
