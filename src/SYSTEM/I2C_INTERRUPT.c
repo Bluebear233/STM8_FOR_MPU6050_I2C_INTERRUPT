@@ -143,6 +143,7 @@ uint8_t I2C_Multiple_Write_With_Block(uint8_t slave_address,
 	I2C->CR2 |= I2C_CR2_START;
 	g_STATE = SB_01;
 	while (g_STATE != INI_00)
+		//这里是等待完成
 		;
 	return 0;
 }
@@ -180,6 +181,7 @@ uint8_t I2C_Multiple_Read_With_Block(uint8_t slave_address, uint8_t reg_address,
 	I2C->CR2 |= I2C_CR2_START;
 	g_STATE = SB_01;
 	while (g_STATE != INI_00)
+		//这里是等待完成
 		;
 
 	return 0;
